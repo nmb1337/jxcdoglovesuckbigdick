@@ -83,9 +83,6 @@
   animate();
 })();
 
-// ==================== API 地址 ====================
-const API_BASE = 'http://localhost:14514';
-
 // ==================== 状态管理 ====================
 const state = {
   questions: [],
@@ -150,7 +147,7 @@ function renderStartPage() {
 // 加载题目并开始
 async function loadAndStartQuiz() {
   try {
-    const resp = await fetch(API_BASE + '/api/questions');
+    const resp = await fetch('/api/questions');
     if (!resp.ok) throw new Error('加载题目失败');
     state.questions = await resp.json();
     state.currentIndex = 0;
@@ -227,7 +224,7 @@ async function selectAnswer(questionId, optionIndex) {
 
   // 检查答案并获取可能的图片
   try {
-    const resp = await fetch(API_BASE + `/api/check/${questionId}`, {
+    const resp = await fetch(`/api/check/${questionId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answer: optionIndex })
@@ -264,7 +261,7 @@ async function finishQuiz() {
   // 从后端获取自定义结果页配置
   let resultConfig = { image: '', text: '🎉 恭喜完成答题！' };
   try {
-    const resp = await fetch(API_BASE + '/api/result');
+    const resp = await fetch('/api/result');
     if (resp.ok) {
       resultConfig = await resp.json();
     }
@@ -288,7 +285,7 @@ function renderResultPage(config) {
 
       ${hasImage ? `
         <div style="margin: 20px 0;">
-          <img src="${API_BASE}${config.image}"
+          <img src="${config.image}"
                alt="result"
                style="max-width:100%; max-height:350px; border-radius:16px; box-shadow: 0 8px 32px rgba(255,107,157,0.3); animation: popIn 0.5s ease;">
         </div>

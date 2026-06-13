@@ -68,9 +68,6 @@
   animate();
 })();
 
-// ==================== API 地址 ====================
-const API_BASE = 'http://localhost:14514';
-
 // ==================== 全局状态 ====================
 let questions = [];
 let resultConfig = { image: '', text: '' };
@@ -79,7 +76,7 @@ const container = document.getElementById('admin-container');
 // ==================== 加载题目 ====================
 async function loadQuestions() {
   try {
-    const resp = await fetch(API_BASE + '/api/questions/admin');
+    const resp = await fetch('/api/questions/admin');
     questions = await resp.json();
     renderList();
   } catch (err) {
@@ -90,7 +87,7 @@ async function loadQuestions() {
 // ==================== 加载结果配置 ====================
 async function loadResultConfig() {
   try {
-    const resp = await fetch(API_BASE + '/api/result');
+    const resp = await fetch('/api/result');
     resultConfig = await resp.json();
   } catch (err) {
     resultConfig = { image: '', text: '' };
@@ -163,7 +160,7 @@ function renderList() {
           <button class="btn-sm btn-img" onclick="uploadResultImage()">📤 上传</button>
           ${hasResultImg ? `<button class="btn-sm btn-delete" onclick="clearResultImage()">🗑️</button>` : ''}
         </div>
-        ${hasResultImg ? `<img src="${API_BASE}${resultConfig.image}" class="current-image-preview" alt="preview" style="margin-top:8px;">` : ''}
+        ${hasResultImg ? `<img src="${resultConfig.image}" class="current-image-preview" alt="preview" style="margin-top:8px;">` : ''}
       </div>
       <div class="form-group">
         <label>📝 结果页文字</label>
@@ -264,13 +261,13 @@ async function saveQuestion(editId) {
   try {
     let resp;
     if (editId) {
-      resp = await fetch(API_BASE + `/api/questions/${editId}`, {
+      resp = await fetch(`/api/questions/${editId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
     } else {
-      resp = await fetch(API_BASE + '/api/questions', {
+      resp = await fetch('/api/questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -288,7 +285,7 @@ async function saveQuestion(editId) {
 async function deleteQuestion(id) {
   if (!confirm('确定要删除这道题目吗？此操作不可撤销！')) return;
   try {
-    const resp = await fetch(API_BASE + `/api/questions/${id}`, { method: 'DELETE' });
+    const resp = await fetch(`/api/questions/${id}`, { method: 'DELETE' });
     if (!resp.ok) throw new Error('删除失败');
     await loadQuestions();
   } catch (err) {
@@ -308,7 +305,7 @@ function uploadImage(id) {
     formData.append('image', file);
 
     try {
-      const resp = await fetch(API_BASE + `/api/upload/${id}`, {
+      const resp = await fetch(`/api/upload/${id}`, {
         method: 'POST',
         body: formData
       });
@@ -327,7 +324,7 @@ function uploadImage(id) {
 async function removeImage(id) {
   if (!confirm('确定要删除该题目的图片吗？')) return;
   try {
-    const resp = await fetch(API_BASE + `/api/questions/${id}`, {
+    const resp = await fetch(`/api/questions/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: '' })
@@ -344,7 +341,7 @@ async function saveResultConfig() {
   const image = document.getElementById('result-image').value.trim();
   const text = document.getElementById('result-text').value.trim();
   try {
-    const resp = await fetch(API_BASE + '/api/result', {
+    const resp = await fetch('/api/result', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image, text })
@@ -367,7 +364,7 @@ function uploadResultImage() {
     const formData = new FormData();
     formData.append('image', input.files[0]);
     try {
-      const resp = await fetch(API_BASE + '/api/result/upload', {
+      const resp = await fetch('/api/result/upload', {
         method: 'POST',
         body: formData
       });

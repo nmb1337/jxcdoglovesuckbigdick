@@ -3,6 +3,7 @@ const multer = require('multer');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 // ==================== 端口配置 ====================
 const API_PORT = 14514;   // 后端 API 端口
@@ -205,11 +206,20 @@ apiApp.listen(API_PORT, () => {
 
 // ==================== 前端静态服务器 (端口 9527) ====================
 const webApp = express();
+
+// 代理：将 /api/* 和 /uploads/* 请求转发到后端 API 服务器（保留完整路径）
+webApp.use(createProxyMiddleware({
+  target: `http://localhost:${API_PORT}`,
+  changeOrigin: true,
+  pathFilter: ['/api/**', '/uploads/**']
+}));
+
+// 静态文件
 webApp.use(express.static(path.join(__dirname, 'public')));
-webApp.use('/uploads', express.static(UPLOADS_DIR));
 
 webApp.listen(WEB_PORT, () => {
   console.log(`🌸 前端页面服务器已启动: http://localhost:${WEB_PORT}`);
   console.log(`   答题页面: http://localhost:${WEB_PORT}`);
   console.log(`   管理后台: http://localhost:${WEB_PORT}/admin.html`);
+  console.log(`   📡 API 代理已启用: /api/* → http://localhost:${API_PORT}`);
 });
