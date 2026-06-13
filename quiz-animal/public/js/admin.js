@@ -68,18 +68,32 @@
   animate();
 })();
 
+// ==================== API 地址 ====================
+const API_BASE = 'http://localhost:14514';
+
 // ==================== 全局状态 ====================
 let questions = [];
+let resultConfig = { image: '', text: '' };
 const container = document.getElementById('admin-container');
 
 // ==================== 加载题目 ====================
 async function loadQuestions() {
   try {
-    const resp = await fetch('/api/questions/admin');
+    const resp = await fetch(API_BASE + '/api/questions/admin');
     questions = await resp.json();
     renderList();
   } catch (err) {
     container.innerHTML = `<div class="glass-card"><p>❌ 加载失败: ${err.message}</p></div>`;
+  }
+}
+
+// ==================== 加载结果配置 ====================
+async function loadResultConfig() {
+  try {
+    const resp = await fetch(API_BASE + '/api/result');
+    resultConfig = await resp.json();
+  } catch (err) {
+    resultConfig = { image: '', text: '' };
   }
 }
 
@@ -115,8 +129,10 @@ function renderList() {
     `;
   }).join('');
 
+  const hasResultImg = resultConfig.image && resultConfig.image.trim() !== '';
+
   container.innerHTML = `
-    <div class="glass-card">
+    <div class="glass-card" style="margin-bottom:20px;">
       <div class="admin-header">
         <span class="admin-title">⚙️ 题目管理后台</span>
         <div style="display:flex; gap:8px;">
@@ -129,6 +145,31 @@ function renderList() {
         <button class="btn-sm btn-add" style="margin-left:12px;" onclick="showAddForm()">➕ 新增题目</button>
       </p>
       ${questions.length === 0 ? '<p style="text-align:center; color:var(--text-light); padding:40px;">还没有题目，点击"新增题目"添加吧~</p>' : cardsHTML}
+    </div>
+
+    <!-- 结果页配置 -->
+    <div class="glass-card">
+      <div class="admin-header">
+        <span class="admin-title">🏁 答题结果页设置</span>
+      </div>
+      <p style="color:var(--text-light); margin-bottom:14px; font-size:0.9em;">
+        无论答题结果如何，完成所有题目后都会跳转到此页面。可自定义显示图片和文字。
+      </p>
+      <div class="form-group">
+        <label>🖼️ 结果页图片</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="text" id="result-image" value="${escapeHtml(resultConfig.image)}"
+                 placeholder="图片路径（可点击右侧按钮上传）" style="flex:1;">
+          <button class="btn-sm btn-img" onclick="uploadResultImage()">📤 上传</button>
+          ${hasResultImg ? `<button class="btn-sm btn-delete" onclick="clearResultImage()">🗑️</button>` : ''}
+        </div>
+        ${hasResultImg ? `<img src="${API_BASE}${resultConfig.image}" class="current-image-preview" alt="preview" style="margin-top:8px;">` : ''}
+      </div>
+      <div class="form-group">
+        <label>📝 结果页文字</label>
+        <textarea id="result-text" placeholder="输入结果页文字（支持换行）...">${escapeHtml(resultConfig.text)}</textarea>
+      </div>
+      <button class="btn-sm btn-save" onclick="saveResultConfig()">💾 保存结果设置</button>
     </div>
   `;
 }
@@ -223,13 +264,13 @@ async function saveQuestion(editId) {
   try {
     let resp;
     if (editId) {
-      resp = await fetch(`/api/questions/${editId}`, {
+      resp = await fetch(API_BASE + `/api/questions/${editId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
     } else {
-      resp = await fetch('/api/questions', {
+      resp = await fetch(API_BASE + '/api/questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -247,7 +288,7 @@ async function saveQuestion(editId) {
 async function deleteQuestion(id) {
   if (!confirm('确定要删除这道题目吗？此操作不可撤销！')) return;
   try {
-    const resp = await fetch(`/api/questions/${id}`, { method: 'DELETE' });
+    const resp = await fetch(API_BASE + `/api/questions/${id}`, { method: 'DELETE' });
     if (!resp.ok) throw new Error('删除失败');
     await loadQuestions();
   } catch (err) {
@@ -267,7 +308,7 @@ function uploadImage(id) {
     formData.append('image', file);
 
     try {
-      const resp = await fetch(`/api/upload/${id}`, {
+      const resp = await fetch(API_BASE + `/api/upload/${id}`, {
         method: 'POST',
         body: formData
       });
@@ -286,7 +327,7 @@ function uploadImage(id) {
 async function removeImage(id) {
   if (!confirm('确定要删除该题目的图片吗？')) return;
   try {
-    const resp = await fetch(`/api/questions/${id}`, {
+    const resp = await fetch(API_BASE + `/api/questions/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: '' })
@@ -298,6 +339,57 @@ async function removeImage(id) {
   }
 }
 
+// ==================== 结果页配置操作 ====================
+async function saveResultConfig() {
+  const image = document.getElementById('result-image').value.trim();
+  const text = document.getElementById('result-text').value.trim();
+  try {
+    const resp = await fetch(API_BASE + '/api/result', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image, text })
+    });
+    if (!resp.ok) throw new Error('保存失败');
+    alert('✅ 结果页设置已保存！');
+    await loadResultConfig();
+    await loadQuestions();
+  } catch (err) {
+    alert('❌ 保存失败: ' + err.message);
+  }
+}
+
+function uploadResultImage() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async () => {
+    if (!input.files || !input.files[0]) return;
+    const formData = new FormData();
+    formData.append('image', input.files[0]);
+    try {
+      const resp = await fetch(API_BASE + '/api/result/upload', {
+        method: 'POST',
+        body: formData
+      });
+      if (!resp.ok) throw new Error('上传失败');
+      const result = await resp.json();
+      document.getElementById('result-image').value = result.image;
+      alert('✅ 图片上传成功！请点击"保存结果设置"生效。');
+      await loadResultConfig();
+      await loadQuestions();
+    } catch (err) {
+      alert('❌ 上传失败: ' + err.message);
+    }
+  };
+  input.click();
+}
+
+async function clearResultImage() {
+  if (!confirm('确定要清除结果页图片吗？')) return;
+  document.getElementById('result-image').value = '';
+  await saveResultConfig();
+}
+
 // ==================== 工具函数 ====================
 function escapeHtml(str) {
   if (!str) return '';
@@ -307,4 +399,7 @@ function escapeHtml(str) {
 }
 
 // ==================== 初始化 ====================
-loadQuestions();
+(async function init() {
+  await loadResultConfig();
+  await loadQuestions();
+})();

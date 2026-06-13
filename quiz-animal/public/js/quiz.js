@@ -83,6 +83,9 @@
   animate();
 })();
 
+// ==================== API 地址 ====================
+const API_BASE = 'http://localhost:14514';
+
 // ==================== 状态管理 ====================
 const state = {
   questions: [],
@@ -147,7 +150,7 @@ function renderStartPage() {
 // 加载题目并开始
 async function loadAndStartQuiz() {
   try {
-    const resp = await fetch('/api/questions');
+    const resp = await fetch(API_BASE + '/api/questions');
     if (!resp.ok) throw new Error('加载题目失败');
     state.questions = await resp.json();
     state.currentIndex = 0;
@@ -224,7 +227,7 @@ async function selectAnswer(questionId, optionIndex) {
 
   // 检查答案并获取可能的图片
   try {
-    const resp = await fetch(`/api/check/${questionId}`, {
+    const resp = await fetch(API_BASE + `/api/check/${questionId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answer: optionIndex })
@@ -258,97 +261,41 @@ function handleNext() {
 async function finishQuiz() {
   state.phase = 'finished';
 
-  // 提交所有答案获取结果
-  let result;
+  // 从后端获取自定义结果页配置
+  let resultConfig = { image: '', text: '🎉 恭喜完成答题！' };
   try {
-    const resp = await fetch('/api/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers: state.answers })
-    });
-    result = await resp.json();
+    const resp = await fetch(API_BASE + '/api/result');
+    if (resp.ok) {
+      resultConfig = await resp.json();
+    }
   } catch (err) {
-    console.error('提交失败:', err);
-    result = { total: state.questions.length, correct: 0, score: 0, details: [] };
+    console.error('获取结果配置失败:', err);
   }
 
-  renderResultPage(result);
+  renderResultPage(resultConfig);
 }
 
-// 渲染结果页面
-function renderResultPage(result) {
-  const { total, correct, score, details } = result;
-  const circumference = 2 * Math.PI * 75;
-  const dashOffset = circumference - (circumference * score / 100);
-
-  // 徽章判定
-  let badges = '';
-  if (score === 100) {
-    badges += '<span class="result-badge badge-gold">🏆 完美满分！二次元之王！</span>';
-  } else if (score >= 80) {
-    badges += '<span class="result-badge badge-silver">⭐ 优秀！资深动漫迷！</span>';
-  } else if (score >= 60) {
-    badges += '<span class="result-badge badge-bronze">🎯 不错哦！继续加油！</span>';
-  } else {
-    badges += '<span class="result-badge badge-cute">💪 萌新也要努力呀~</span>';
-  }
-
-  // 结果表情
-  let resultEmoji = '🌸';
-  if (score === 100) resultEmoji = '👑';
-  else if (score >= 80) resultEmoji = '🌟';
-  else if (score >= 60) resultEmoji = '🎀';
-  else if (score >= 40) resultEmoji = '💪';
-  else resultEmoji = '🥺';
-
-  // 回顾
-  const optionLabels = ['A', 'B', 'C', 'D'];
-  let reviewHTML = details.map(d => {
-    const isCorrect = d.isCorrect;
-    const cls = isCorrect ? 'correct-review' : 'wrong-review';
-    return `
-      <div class="review-item ${cls}">
-        <strong>${isCorrect ? '✅' : '❌'} Q${d.id}:</strong> ${d.question}
-        <br><small style="color:${isCorrect ? 'var(--success-color)' : 'var(--error-color)'}">
-          你的答案: ${d.userAnswer >= 0 ? optionLabels[d.userAnswer] : '未答'}
-          ${!isCorrect ? ' | 正确答案: ' + optionLabels[d.correctAnswer] : ''}
-        </small>
-      </div>
-    `;
-  }).join('');
+// 渲染结果页面（基于后端配置的图片+文字）
+function renderResultPage(config) {
+  const hasImage = config.image && config.image.trim() !== '';
+  const textHtml = (config.text || '🎉 恭喜完成答题！')
+    .replace(/\n/g, '<br>');
 
   mainContainer.innerHTML = `
     <div class="glass-card result-section">
-      <span class="result-emoji">${resultEmoji}</span>
+      <span class="result-emoji">🌸</span>
       <h2 style="margin:12px 0; font-weight:900; font-size:1.6em;">答题结束！</h2>
 
-      <div class="score-circle">
-        <svg width="180" height="180" viewBox="0 0 180 180">
-          <defs>
-            <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#ff6b9d"/>
-              <stop offset="100%" stop-color="#c77dff"/>
-            </linearGradient>
-          </defs>
-          <circle class="bg-circle" cx="90" cy="90" r="75"/>
-          <circle class="fg-circle" cx="90" cy="90" r="75"
-                  stroke-dasharray="${circumference}"
-                  stroke-dashoffset="${circumference}"
-                  id="score-circle-anim"/>
-        </svg>
-        <div class="score-text" id="score-num">0</div>
-      </div>
+      ${hasImage ? `
+        <div style="margin: 20px 0;">
+          <img src="${API_BASE}${config.image}"
+               alt="result"
+               style="max-width:100%; max-height:350px; border-radius:16px; box-shadow: 0 8px 32px rgba(255,107,157,0.3); animation: popIn 0.5s ease;">
+        </div>
+      ` : ''}
 
-      <p class="score-label">正确率</p>
-      <p class="score-correct">答对 <strong style="font-size:1.3em;color:var(--pink-primary);">${correct}</strong> / ${total} 题</p>
-
-      <div style="margin-bottom:20px;">
-        ${badges}
-      </div>
-
-      <div class="answer-review">
-        <h3 style="margin-bottom:14px;">📋 答题回顾</h3>
-        ${reviewHTML}
+      <div style="font-size:1.15em; line-height:1.8; color: var(--text-dark); margin:16px 0;">
+        ${textHtml}
       </div>
 
       <button class="btn-primary" style="margin-top:24px;" onclick="restartQuiz()">
@@ -359,25 +306,6 @@ function renderResultPage(result) {
       </div>
     </div>
   `;
-
-  // 分数动画
-  setTimeout(() => {
-    const circle = document.getElementById('score-circle-anim');
-    const numEl = document.getElementById('score-num');
-    if (circle) circle.style.strokeDashoffset = dashOffset;
-    if (numEl) {
-      let current = 0;
-      const step = Math.max(1, Math.floor(score / 40));
-      const timer = setInterval(() => {
-        current += step;
-        if (current >= score) {
-          current = score;
-          clearInterval(timer);
-        }
-        numEl.textContent = current + '%';
-      }, 30);
-    }
-  }, 300);
 }
 
 // 重新开始

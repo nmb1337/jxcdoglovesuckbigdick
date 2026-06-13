@@ -4,22 +4,58 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 
-const app = express();
-const PORT = 3000;
+// ==================== 端口配置 ====================
+const API_PORT = 14514;   // 后端 API 端口
+const WEB_PORT = 9527;     // 前端静态页面端口
 
-// ==================== 中间件 ====================
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// ==================== 数据文件路径 ====================
+const DATA_DIR = path.join(__dirname, 'data');
+const QUESTIONS_FILE = path.join(DATA_DIR, 'questions.json');
+const RESULT_FILE = path.join(DATA_DIR, 'result.json');
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+
+// 确保目录存在
+[DATA_DIR, UPLOADS_DIR].forEach(dir => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+});
+
+// ==================== 数据读写工具 ====================
+function readJSON(filePath, defaultVal) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  } catch (e) {
+    return defaultVal;
+  }
+}
+
+function writeJSON(filePath, data) {
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+function loadQuestions() {
+  return readJSON(QUESTIONS_FILE, []);
+}
+
+function saveQuestions(questions) {
+  writeJSON(QUESTIONS_FILE, questions);
+}
+
+function loadResult() {
+  return readJSON(RESULT_FILE, { image: '', text: '🎉 恭喜完成答题！' });
+}
+
+function saveResult(result) {
+  writeJSON(RESULT_FILE, result);
+}
+
+// 初始化默认数据
+if (!fs.existsSync(RESULT_FILE)) {
+  saveResult({ image: '', text: '🎉 恭喜完成答题！\n感谢你的参与~' });
+}
 
 // ==================== 文件上传配置 ====================
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, 'uploads');
-    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
-  },
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
@@ -28,30 +64,16 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
-// ==================== 题目数据文件路径 ====================
-const DATA_FILE = path.join(__dirname, 'data', 'questions.json');
+// ==================== 后端 API 服务器 (端口 114514) ====================
+const apiApp = express();
+apiApp.use(cors());
+apiApp.use(express.json());
+apiApp.use('/uploads', express.static(UPLOADS_DIR));
 
-// 读取题目
-function loadQuestions() {
-  try {
-    const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-    return JSON.parse(raw);
-  } catch (e) {
-    return [];
-  }
-}
-
-// 保存题目
-function saveQuestions(questions) {
-  const dir = path.dirname(DATA_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(DATA_FILE, JSON.stringify(questions, null, 2), 'utf-8');
-}
-
-// ==================== API 路由 ====================
+// ---- 题目 API ----
 
 // 获取所有题目（前端答题用，不返回答案）
-app.get('/api/questions', (req, res) => {
+apiApp.get('/api/questions', (req, res) => {
   const questions = loadQuestions();
   // 返回时不带正确答案
   const safe = questions.map(q => ({
@@ -64,13 +86,13 @@ app.get('/api/questions', (req, res) => {
 });
 
 // 获取所有题目（管理端用，包含答案）
-app.get('/api/questions/admin', (req, res) => {
+apiApp.get('/api/questions/admin', (req, res) => {
   const questions = loadQuestions();
   res.json(questions);
 });
 
 // 获取单个题目
-app.get('/api/questions/:id', (req, res) => {
+apiApp.get('/api/questions/:id', (req, res) => {
   const questions = loadQuestions();
   const q = questions.find(q => q.id === parseInt(req.params.id));
   if (!q) return res.status(404).json({ error: '题目不存在' });
@@ -78,7 +100,7 @@ app.get('/api/questions/:id', (req, res) => {
 });
 
 // 新增题目
-app.post('/api/questions', (req, res) => {
+apiApp.post('/api/questions', (req, res) => {
   const questions = loadQuestions();
   const { question, options, answer, image } = req.body;
   const newId = questions.length > 0 ? Math.max(...questions.map(q => q.id)) + 1 : 1;
@@ -95,7 +117,7 @@ app.post('/api/questions', (req, res) => {
 });
 
 // 更新题目
-app.put('/api/questions/:id', (req, res) => {
+apiApp.put('/api/questions/:id', (req, res) => {
   const questions = loadQuestions();
   const idx = questions.findIndex(q => q.id === parseInt(req.params.id));
   if (idx === -1) return res.status(404).json({ error: '题目不存在' });
@@ -109,7 +131,7 @@ app.put('/api/questions/:id', (req, res) => {
 });
 
 // 删除题目
-app.delete('/api/questions/:id', (req, res) => {
+apiApp.delete('/api/questions/:id', (req, res) => {
   let questions = loadQuestions();
   const before = questions.length;
   questions = questions.filter(q => q.id !== parseInt(req.params.id));
@@ -119,7 +141,7 @@ app.delete('/api/questions/:id', (req, res) => {
 });
 
 // 上传图片（为某个题目设置图片）
-app.post('/api/upload/:id', upload.single('image'), (req, res) => {
+apiApp.post('/api/upload/:id', upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: '没有上传文件' });
   const questions = loadQuestions();
   const idx = questions.findIndex(q => q.id === parseInt(req.params.id));
@@ -134,34 +156,8 @@ app.post('/api/upload/:id', upload.single('image'), (req, res) => {
   res.json({ success: true, image: imageUrl });
 });
 
-// 批量提交答案（前端提交所有答案，返回得分）
-app.post('/api/submit', (req, res) => {
-  const { answers } = req.body; // { "1": 0, "2": 1, ... }
-  const questions = loadQuestions();
-  let correct = 0;
-  const total = questions.length;
-  const details = questions.map(q => {
-    const userAnswer = answers[q.id] !== undefined ? answers[q.id] : -1;
-    const isCorrect = userAnswer === q.answer;
-    if (isCorrect) correct++;
-    return {
-      id: q.id,
-      question: q.question,
-      userAnswer,
-      correctAnswer: q.answer,
-      isCorrect
-    };
-  });
-  res.json({
-    total,
-    correct,
-    score: total > 0 ? Math.round((correct / total) * 100) : 0,
-    details
-  });
-});
-
 // 提交单个题目答案
-app.post('/api/check/:id', (req, res) => {
+apiApp.post('/api/check/:id', (req, res) => {
   const questions = loadQuestions();
   const q = questions.find(q => q.id === parseInt(req.params.id));
   if (!q) return res.status(404).json({ error: '题目不存在' });
@@ -175,10 +171,45 @@ app.post('/api/check/:id', (req, res) => {
   });
 });
 
-// 启动服务器
-app.listen(PORT, () => {
-  console.log(`🎌 二次元答题服务器已启动！`);
-  console.log(`   前端页面: http://localhost:${PORT}`);
-  console.log(`   管理后台: http://localhost:${PORT}/admin.html`);
-  console.log(`   API 地址: http://localhost:${PORT}/api/questions`);
+// ---- 结果页 API ----
+
+// 获取结果页配置（前端用）
+apiApp.get('/api/result', (req, res) => {
+  res.json(loadResult());
+});
+
+// 更新结果页配置（管理端用）
+apiApp.put('/api/result', (req, res) => {
+  const { image, text } = req.body;
+  const result = loadResult();
+  if (image !== undefined) result.image = image;
+  if (text !== undefined) result.text = text;
+  saveResult(result);
+  res.json({ success: true, result });
+});
+
+// 上传结果页图片
+apiApp.post('/api/result/upload', upload.single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: '没有上传文件' });
+  const imageUrl = '/uploads/' + req.file.filename;
+  const result = loadResult();
+  result.image = imageUrl;
+  saveResult(result);
+  res.json({ success: true, image: imageUrl });
+});
+
+// 启动 API 服务器
+apiApp.listen(API_PORT, () => {
+  console.log(`🔧 后端 API 服务器已启动: http://localhost:${API_PORT}`);
+});
+
+// ==================== 前端静态服务器 (端口 9527) ====================
+const webApp = express();
+webApp.use(express.static(path.join(__dirname, 'public')));
+webApp.use('/uploads', express.static(UPLOADS_DIR));
+
+webApp.listen(WEB_PORT, () => {
+  console.log(`🌸 前端页面服务器已启动: http://localhost:${WEB_PORT}`);
+  console.log(`   答题页面: http://localhost:${WEB_PORT}`);
+  console.log(`   管理后台: http://localhost:${WEB_PORT}/admin.html`);
 });
