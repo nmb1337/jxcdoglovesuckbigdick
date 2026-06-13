@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🌸 二次元答题挑战 - Anime Quiz</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- 樱花粒子画布 -->
+  <canvas id="sakura-canvas"></canvas>
+
+  <!-- 浮动装饰 -->
+  <div class="floating-decor">🌸</div>
+  <div class="floating-decor">✨</div>
+  <div class="floating-decor">🎀</div>
+  <div class="floating-decor">💮</div>
+
+  <!-- 主容器 -->
+  <div class="main-container" id="main-container">
+    <!-- 动态渲染内容 -->
+  </div>
+
+  <!-- 图片弹出层（隐藏） -->
+  <div class="image-overlay" id="image-overlay" style="display:none;">
+    <img id="overlay-img" src="" alt="question image">
+  </div>
+
+  <script src="js/quiz.js"></script>
+</body>
+</html>

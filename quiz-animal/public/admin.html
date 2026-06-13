@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚙️ 题目管理后台 - Quiz Admin</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* 管理面板专用样式 */
+    .admin-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .admin-title {
+      font-size: 1.5em;
+      font-weight: 900;
+      background: var(--btn-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .btn-sm {
+      padding: 8px 20px;
+      font-size: 0.9em;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.25s ease;
+    }
+    .btn-add {
+      background: var(--btn-gradient);
+      color: white;
+    }
+    .btn-add:hover {
+      box-shadow: 0 4px 16px rgba(255, 107, 157, 0.4);
+      transform: translateY(-1px);
+    }
+    .btn-back {
+      background: rgba(255,255,255,0.5);
+      color: var(--text-dark);
+      border: 1px solid rgba(255,107,157,0.3);
+    }
+    .btn-edit {
+      background: rgba(199, 125, 255, 0.2);
+      color: var(--purple-accent);
+      border: 1px solid rgba(199, 125, 255, 0.3);
+    }
+    .btn-delete {
+      background: rgba(248, 113, 113, 0.15);
+      color: var(--error-color);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+    }
+    .btn-img {
+      background: rgba(126, 200, 227, 0.2);
+      color: var(--blue-accent);
+      border: 1px solid rgba(126, 200, 227, 0.3);
+    }
+    .btn-save {
+      background: var(--btn-gradient);
+      color: white;
+      margin-top: 16px;
+      width: 100%;
+    }
+    .btn-cancel {
+      background: rgba(255,255,255,0.5);
+      color: var(--text-dark);
+      border: 1px solid rgba(0,0,0,0.1);
+      margin-top: 8px;
+      width: 100%;
+    }
+
+    .question-card {
+      background: rgba(255,255,255,0.55);
+      backdrop-filter: blur(12px);
+      border-radius: 16px;
+      padding: 18px 20px;
+      margin-bottom: 12px;
+      border: 1px solid rgba(255,107,157,0.15);
+      transition: all 0.25s ease;
+    }
+    .question-card:hover {
+      box-shadow: 0 4px 20px rgba(255,107,157,0.15);
+    }
+    .question-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .question-card-num {
+      font-weight: 900;
+      color: var(--pink-primary);
+      font-size: 1.1em;
+      white-space: nowrap;
+    }
+    .question-card-text {
+      flex: 1;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+    .question-card-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      font-size: 0.85em;
+      color: var(--text-light);
+    }
+    .question-card-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .has-image {
+      color: var(--blue-accent);
+      font-weight: 600;
+    }
+    .no-image {
+      color: #999;
+    }
+
+    /* 编辑模态框 */
+    .modal-mask {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    .modal-content {
+      background: white;
+      border-radius: 20px;
+      padding: 28px 24px;
+      width: 90%;
+      max-width: 600px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .modal-content h3 {
+      margin-bottom: 16px;
+      font-size: 1.3em;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+      font-size: 0.9em;
+      color: var(--text-dark);
+    }
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 2px solid rgba(255,107,157,0.2);
+      border-radius: 12px;
+      font-size: 0.95em;
+      font-family: inherit;
+      transition: border-color 0.25s;
+      background: rgba(255,255,255,0.8);
+    }
+    .form-group input:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--pink-primary);
+      box-shadow: 0 0 0 3px rgba(255,107,157,0.1);
+    }
+    .form-group textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+    .option-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .option-row input {
+      flex: 1;
+    }
+    .option-row .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.85em;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .current-image-preview {
+      max-width: 160px;
+      max-height: 120px;
+      border-radius: 10px;
+      margin-top: 8px;
+      border: 2px solid rgba(255,107,157,0.2);
+    }
+
+    @media (max-width: 600px) {
+      .question-card-header {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="sakura-canvas"></canvas>
+
+  <div class="main-container" id="admin-container" style="padding-top:40px; padding-bottom:40px;">
+    <!-- 动态渲染 -->
+  </div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>
